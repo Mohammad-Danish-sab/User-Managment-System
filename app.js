@@ -1,4 +1,8 @@
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs"
+import multer from "multer";
 import bodyParser from "body-parser";
 import bcrypt from "bcrypt";
 import session from "express-session";
@@ -6,17 +10,57 @@ import dotenv from "dotenv";
 import connectDB from "./db.js";
 import Account from "./models/Account.js";
 import User from "./models/User.js";
+import userRoutes from "./routes/userRoutes.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 connectDB();
 
 app.set("view engine", "ejs");
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
+// app.use("/uploads", express.static("public/uploads"));
+app.use("/", userRoutes);
+
+// Ensure uploads folder exists
+const uploadDir = path.join(__dirname, "public", "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// multer setup
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    const unique = `${Date.now()}-${Math.round(Math.random()*1e9)}${ext}`;
+    cb(null, unique);
+  }
+});
+
+function fileFilter(req, file, cb) {
+  // accept images only
+  if (!file.mimetype.startsWith("image/")) {
+    cb(new Error("Only image files are allowed!"), false);
+    return;
+  }
+  cb(null, true);
+}
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 2 * 1024 * 1024 } // 2 MB
+});
 
 app.use(
   session({
@@ -51,6 +95,9 @@ app.post("/login", async (req, res) => {
       id: user._id,
       username: user.username,
       email: user.email,
+      role: user.role || "viewer",
+      avatar: user.avatar || "",
+      bio: user.bio || ""
     };
     res.redirect("/");
   } catch (err) {
@@ -80,6 +127,95 @@ app.post("/register", async (req, res) => {
     res.render("register", { error: "Registration failed." });
   }
 });
+
+// GET profile page
+app.get("/profile", requireLogin, async (req, res) => {
+  try {
+    const account = await Account.findById(req.session.user.id).lean();
+    res.render("profile", { account, user: req.session.user, flash: null });
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+// POST upload avatar
+app.post(
+  "/profile/avatar",
+  requireLogin,
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        const account = await Account.findById(req.session.user.id).lean();
+        return res.render("profile", {
+          account,
+          user: req.session.user,
+          flash: { type: "danger", msg: "No file uploaded." },
+        });
+      }
+
+      const relativePath = `/uploads/${req.file.filename}`;
+
+      const updated = await Account.findByIdAndUpdate(
+        req.session.user.id,
+        { avatar: relativePath },
+        { new: true }
+      ).lean();
+
+      // ✔ FIXED: Prevent undefined value
+      req.session.user.avatar = updated.avatar || "";
+
+      res.redirect("/profile");
+    } catch (err) {
+      console.error(err);
+      res.status(500).send("Upload failed.");
+    }
+  }
+);
+
+
+// POST remove avatar
+app.post("/profile/remove-avatar", requireLogin, async (req, res) => {
+  try {
+    const account = await Account.findById(req.session.user.id);
+    if (account && account.avatar) {
+      // remove file on disk (best effort)
+      const filename = path.basename(account.avatar);
+      const filePath = path.join(uploadDir, filename);
+      fs.unlink(filePath, err => {
+        if (err) console.warn("Failed to delete previous avatar:", err);
+      });
+    }
+
+    account.avatar = "";
+    await account.save();
+
+    req.session.user.avatar = "";
+    res.redirect("/profile");
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+// POST update bio
+app.post("/profile/bio", requireLogin, async (req, res) => {
+  try {
+    const { bio } = req.body;
+    // basic sanitization: trim & limit length
+    const safeBio = (bio || "").toString().slice(0, 500).trim();
+    const updated = await Account.findByIdAndUpdate(req.session.user.id, { bio: safeBio }, { new: true }).lean();
+
+    // if you want to display flash messages on profile, render with message
+    res.render("profile", { account: updated, user: req.session.user, flash: { type: "success", msg: "Bio saved." } });
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+
 
 // Logout
 app.get("/logout", (req, res) => {

@@ -16,10 +16,13 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container-fluid">
       <a class="navbar-brand" href="/">User Managment System</a>
-      <div class="d-flex text-white">
-        <span class="me-3">👋 Welcome, <%= user.username %></span>
-        <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
-      </div>
+     <div class="d-flex text-white align-items-center">
+  <% if (user && user.avatar) { %>
+    <img src="<%= user.avatar %>" alt="avatar" class="me-2" style="width:36px;height:36px;object-fit:cover;border-radius:50%;">
+  <% } %>
+  <span class="me-3">👋 Welcome, <%= user.username %> (<%= user.role %>)</span>
+  <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
+</div>
     </div>
   </nav>
 
