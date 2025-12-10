@@ -11,6 +11,8 @@ import connectDB from "./db.js";
 import Account from "./models/Account.js";
 import User from "./models/User.js";
 import userRoutes from "./routes/userRoutes.js";
+import upload from "./middleware/upload.js";
+
 
 dotenv.config();
 
@@ -35,32 +37,32 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// multer setup
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const unique = `${Date.now()}-${Math.round(Math.random()*1e9)}${ext}`;
-    cb(null, unique);
-  }
-});
+// // multer setup
+// const storage = multer.diskStorage({
+//   destination: function (req, file, cb) {
+//     cb(null, uploadDir);
+//   },
+//   filename: function (req, file, cb) {
+//     const ext = path.extname(file.originalname);
+//     const unique = `${Date.now()}-${Math.round(Math.random()*1e9)}${ext}`;
+//     cb(null, unique);
+//   }
+// });
 
-function fileFilter(req, file, cb) {
-  // accept images only
-  if (!file.mimetype.startsWith("image/")) {
-    cb(new Error("Only image files are allowed!"), false);
-    return;
-  }
-  cb(null, true);
-}
+// function fileFilter(req, file, cb) {
+//   // accept images only
+//   if (!file.mimetype.startsWith("image/")) {
+//     cb(new Error("Only image files are allowed!"), false);
+//     return;
+//   }
+//   cb(null, true);
+// }
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 2 * 1024 * 1024 } // 2 MB
-});
+// const upload = multer({
+//   storage,
+//   fileFilter,
+//   limits: { fileSize: 2 * 1024 * 1024 } // 2 MB
+// });
 
 app.use(
   session({
@@ -132,14 +134,13 @@ app.post("/register", async (req, res) => {
 app.get("/profile", requireLogin, async (req, res) => {
   try {
     const account = await Account.findById(req.session.user.id).lean();
-    res.render("profile", { account, user: req.session.user, flash: null });
+    res.render("profile", { account:update, user: req.session.user, flash: {}});
   } catch (err) {
     console.error(err);
     res.sendStatus(500);
   }
 });
 
-// POST upload avatar
 app.post(
   "/profile/avatar",
   requireLogin,
@@ -148,6 +149,9 @@ app.post(
     try {
       if (!req.file) {
         const account = await Account.findById(req.session.user.id).lean();
+        req.session.user.avatar = updated.avatar;
+        req.session.save();
+
         return res.render("profile", {
           account,
           user: req.session.user,
@@ -163,7 +167,6 @@ app.post(
         { new: true }
       ).lean();
 
-      // ✔ FIXED: Prevent undefined value
       req.session.user.avatar = updated.avatar || "";
 
       res.redirect("/profile");
@@ -174,13 +177,10 @@ app.post(
   }
 );
 
-
-// POST remove avatar
 app.post("/profile/remove-avatar", requireLogin, async (req, res) => {
   try {
     const account = await Account.findById(req.session.user.id);
     if (account && account.avatar) {
-      // remove file on disk (best effort)
       const filename = path.basename(account.avatar);
       const filePath = path.join(uploadDir, filename);
       fs.unlink(filePath, err => {
@@ -203,19 +203,15 @@ app.post("/profile/remove-avatar", requireLogin, async (req, res) => {
 app.post("/profile/bio", requireLogin, async (req, res) => {
   try {
     const { bio } = req.body;
-    // basic sanitization: trim & limit length
     const safeBio = (bio || "").toString().slice(0, 500).trim();
     const updated = await Account.findByIdAndUpdate(req.session.user.id, { bio: safeBio }, { new: true }).lean();
 
-    // if you want to display flash messages on profile, render with message
     res.render("profile", { account: updated, user: req.session.user, flash: { type: "success", msg: "Bio saved." } });
   } catch (err) {
     console.error(err);
     res.sendStatus(500);
   }
 });
-
-
 
 // Logout
 app.get("/logout", (req, res) => {
