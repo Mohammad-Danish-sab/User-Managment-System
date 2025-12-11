@@ -12,6 +12,8 @@ import Account from "./models/Account.js";
 import User from "./models/User.js";
 import userRoutes from "./routes/userRoutes.js";
 import upload from "./middleware/upload.js";
+import dashboardRouter from "./routes/dashboard.js";
+import { requireLogin } from "./middleware/auth.js";
 
 
 dotenv.config();
@@ -30,6 +32,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 // app.use("/uploads", express.static("public/uploads"));
 app.use("/", userRoutes);
+app.use("/dashboard", dashboardRouter);
 
 // Ensure uploads folder exists
 const uploadDir = path.join(__dirname, "public", "uploads");
@@ -72,12 +75,12 @@ app.use(
   })
 );
 
-function requireLogin(req, res, next) {
-  if (!req.session.user) {
-    return res.redirect("/login");
-  }
-  next();
-}
+// function requireLogin(req, res, next) {
+//   if (!req.session.user) {
+//     return res.redirect("/login");
+//   }
+//   next();
+// }
 
 app.get("/login", (req, res) => {
   res.render("login", { error: null });
@@ -134,7 +137,8 @@ app.post("/register", async (req, res) => {
 app.get("/profile", requireLogin, async (req, res) => {
   try {
     const account = await Account.findById(req.session.user.id).lean();
-    res.render("profile", { account:update, user: req.session.user, flash: {}});
+    // pass the account fetched from DB and the session user
+    res.render("profile", { account, user: req.session.user, flash: {} });
   } catch (err) {
     console.error(err);
     res.sendStatus(500);
@@ -147,17 +151,21 @@ app.post(
   upload.single("avatar"),
   async (req, res) => {
     try {
-      if (!req.file) {
-        const account = await Account.findById(req.session.user.id).lean();
-        req.session.user.avatar = updated.avatar;
-        req.session.save();
+    if (!req.file) {
+      const account = await Account.findById(req.session.user.id).lean();
 
-        return res.render("profile", {
-          account,
-          user: req.session.user,
-          flash: { type: "danger", msg: "No file uploaded." },
-        });
-      }
+      // update session avatar with current DB value (prevent undefined)
+      req.session.user.avatar = account.avatar || "";
+      await new Promise((resolve, reject) => {
+        req.session.save((err) => (err ? reject(err) : resolve()));
+      });
+
+      return res.render("profile", {
+        account,
+        user: req.session.user,
+        flash: { type: "danger", msg: "No file uploaded." },
+      });
+    }
 
       const relativePath = `/uploads/${req.file.filename}`;
 
@@ -166,10 +174,18 @@ app.post(
         { avatar: relativePath },
         { new: true }
       ).lean();
+req.session.user.avatar = updated.avatar || "";
 
-      req.session.user.avatar = updated.avatar || "";
+// also update bio in session if present (optional)
+req.session.user.bio = updated.bio || "";
 
-      res.redirect("/profile");
+// persist session then redirect
+await new Promise((resolve, reject) => {
+  req.session.save((err) => (err ? reject(err) : resolve()));
+});
+
+res.redirect("/profile");
+
     } catch (err) {
       console.error(err);
       res.status(500).send("Upload failed.");

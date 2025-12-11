@@ -34,13 +34,13 @@
         <div class="card p-4 text-center">
           <h5>Your Avatar</h5>
           <div class="my-3">
-            <% if (account && account.avatar) { %>
+          <% if (account && account.avatar && account.avatar.trim() !== "") { %>
               <img src="<%= account.avatar %>" alt="avatar" class="avatar">
-            <% } else { %>
+              <% } else { %>
               <div class="avatar d-flex align-items-center justify-content-center bg-secondary text-white">
-                <strong><%= account.username ? account.username[0].toUpperCase() : 'U' %></strong>
+             <strong><%= account && account.username ? account.username[0].toUpperCase() : 'U' %></strong>
               </div>
-            <% } %>
+                <% } %>
           </div>
 
          <form action="/profile/avatar" method="post" enctype="multipart/form-data">
