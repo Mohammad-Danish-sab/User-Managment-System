@@ -1,47 +1,44 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>User Dashboard</title>
-    <link rel="stylesheet" href="/css/style.css">
-</head>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
 
-<body>
-<%- include("partials/navbar") %>
+  <body>
+    <%- include("partials/navbar") %>
 
-<div class="container">
-    <h1>Welcome, <%= user.username %> 👋</h1>
+    <div class="container">
+      <h1>Welcome, <%= user.username %> 👋</h1>
 
-    <div class="dashboard-box">
-
+      <div class="dashboard-box">
         <!-- Profile Section -->
         <div class="profile-block">
-            <h2>Your Profile</h2>
+          <h2>Your Profile</h2>
 
-            <% if (account.avatar && account.avatar !== "") { %>
-                <img src="<%= account.avatar %>" class="avatar">
-            <% } else { %>
-                <img src="/default-avatar.png" class="avatar">
-            <% } %>
+          <% if (account.avatar && account.avatar !== "") { %>
+          <img src="<%= account.avatar %>" class="avatar" />
+          <% } else { %>
+          <img src="/default-avatar.png" class="avatar" />
+          <% } %>
 
-            <p><strong>Email:</strong> <%= user.email %></p>
-            <p><strong>Bio:</strong> <%= account.bio || "No bio added yet." %></p>
+          <p><strong>Email:</strong> <%= user.email %></p>
+          <p><strong>Bio:</strong> <%= account.bio || "No bio added yet." %></p>
 
-            <a href="/profile" class="btn">Edit Profile</a>
+          <a href="/profile" class="btn">Edit Profile</a>
         </div>
 
         <!-- Quick Actions -->
         <div class="action-block">
-            <h2>Quick Actions</h2>
-            <ul>
-                <li><a href="/profile">Update Profile</a></li>
-                <li><a href="/dashboard/activity">View Activity</a></li>
-                <li><a href="/change-password">Change Password</a></li>
-                <li><a href="/logout">Logout</a></li>
-            </ul>
+          <h2>Quick Actions</h2>
+          <ul>
+            <li><a href="/profile">Update Profile</a></li>
+            <li><a href="/dashboard/activity">View Activity</a></li>
+            <li><a href="/change-password">Change Password</a></li>
+            <li><a href="/logout">Logout</a></li>
+          </ul>
         </div>
-
+      </div>
     </div>
-</div>
-
-</body>
+  </body>
 </html>

@@ -1,6 +1,6 @@
 import express from "express";
 import { requireLogin } from "../middleware/auth.js";
-import Account from "./models/account.js";
+import Account from "../models/Account.js";
 
 const router = express.Router();
 

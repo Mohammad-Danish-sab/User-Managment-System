@@ -1,5 +1,5 @@
 import express from "express";
-import upload from "../middleware/upload.js"; 
+import upload from "../middleware/upload.js";
 import Account from "../models/Account.js";
 
 const router = express.Router();
@@ -17,6 +17,17 @@ router.post("/update-profile", upload.single("avatar"), async (req, res) => {
     },
     { new: true }
   );
+
+  // router.get("/profile", async (req, res) => {
+  //   if (!req.session.user) return res.redirect("/login");
+
+  //   const account = await Account.findById(req.session.user.id);
+
+  //   res.render("profile", {
+  //     user: req.session.user,
+  //     account: account,
+  //   });
+  // });
 
 
   req.session.user.avatar = updated.avatar;

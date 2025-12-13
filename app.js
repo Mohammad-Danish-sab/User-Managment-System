@@ -1,20 +1,21 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import fs from "fs"
+import fs from "fs";
 import multer from "multer";
 import bodyParser from "body-parser";
 import bcrypt from "bcrypt";
 import session from "express-session";
 import dotenv from "dotenv";
 import connectDB from "./db.js";
+
 import Account from "./models/Account.js";
 import User from "./models/User.js";
+
 import userRoutes from "./routes/userRoutes.js";
 import upload from "./middleware/upload.js";
 import dashboardRouter from "./routes/dashboard.js";
 import { requireLogin } from "./middleware/auth.js";
-
 
 dotenv.config();
 
@@ -33,6 +34,8 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 // app.use("/uploads", express.static("public/uploads"));
 app.use("/", userRoutes);
 app.use("/dashboard", dashboardRouter);
+// app.use("/", userRoutes);
+
 
 // Ensure uploads folder exists
 const uploadDir = path.join(__dirname, "public", "uploads");
@@ -102,7 +105,7 @@ app.post("/login", async (req, res) => {
       email: user.email,
       role: user.role || "viewer",
       avatar: user.avatar || "",
-      bio: user.bio || ""
+      bio: user.bio || "",
     };
     res.redirect("/");
   } catch (err) {
@@ -145,89 +148,96 @@ app.get("/profile", requireLogin, async (req, res) => {
   }
 });
 
-app.post(
-  "/profile/avatar",
-  requireLogin,
-  upload.single("avatar"),
-  async (req, res) => {
-    try {
-    if (!req.file) {
-      const account = await Account.findById(req.session.user.id).lean();
+// app.post(
+//   "/profile/avatar",
+//   requireLogin,
+//   upload.single("avatar"),
+//   async (req, res) => {
+//     try {
+//       if (!req.file) {
+//         const account = await Account.findById(req.session.user.id).lean();
 
-      // update session avatar with current DB value (prevent undefined)
-      req.session.user.avatar = account.avatar || "";
-      await new Promise((resolve, reject) => {
-        req.session.save((err) => (err ? reject(err) : resolve()));
-      });
+//         // update session avatar with current DB value (prevent undefined)
+//         req.session.user.avatar = account.avatar || "";
+//         await new Promise((resolve, reject) => {
+//           req.session.save((err) => (err ? reject(err) : resolve()));
+//         });
 
-      return res.render("profile", {
-        account,
-        user: req.session.user,
-        flash: { type: "danger", msg: "No file uploaded." },
-      });
-    }
+//         return res.render("profile", {
+//           account,
+//           user: req.session.user,
+//           flash: { type: "danger", msg: "No file uploaded." },
+//         });
+//       }
 
-      const relativePath = `/uploads/${req.file.filename}`;
+//       const relativePath = `/uploads/${req.file.filename}`;
 
-      const updated = await Account.findByIdAndUpdate(
-        req.session.user.id,
-        { avatar: relativePath },
-        { new: true }
-      ).lean();
-req.session.user.avatar = updated.avatar || "";
+//       const updated = await Account.findByIdAndUpdate(
+//         req.session.user.id,
+//         { avatar: relativePath },
+//         { new: true }
+//       ).lean();
+//       req.session.user.avatar = updated.avatar || "";
 
-// also update bio in session if present (optional)
-req.session.user.bio = updated.bio || "";
+//       // also update bio in session if present (optional)
+//       req.session.user.bio = updated.bio || "";
 
-// persist session then redirect
-await new Promise((resolve, reject) => {
-  req.session.save((err) => (err ? reject(err) : resolve()));
-});
+//       // persist session then redirect
+//       await new Promise((resolve, reject) => {
+//         req.session.save((err) => (err ? reject(err) : resolve()));
+//       });
 
-res.redirect("/profile");
+//       res.redirect("/profile");
+//     } catch (err) {
+//       console.error(err);
+//       res.status(500).send("Upload failed.");
+//     }
+//   }
+// );
 
-    } catch (err) {
-      console.error(err);
-      res.status(500).send("Upload failed.");
-    }
-  }
-);
+// app.post("/profile/remove-avatar", requireLogin, async (req, res) => {
+//   try {
+//     const account = await Account.findById(req.session.user.id);
+//     if (account && account.avatar) {
+//       const filename = path.basename(account.avatar);
+//       const filePath = path.join(uploadDir, filename);
+//       fs.unlink(filePath, (err) => {
+//         if (err) console.warn("Failed to delete previous avatar:", err);
+//       });
+//     }
 
-app.post("/profile/remove-avatar", requireLogin, async (req, res) => {
-  try {
-    const account = await Account.findById(req.session.user.id);
-    if (account && account.avatar) {
-      const filename = path.basename(account.avatar);
-      const filePath = path.join(uploadDir, filename);
-      fs.unlink(filePath, err => {
-        if (err) console.warn("Failed to delete previous avatar:", err);
-      });
-    }
+//     account.avatar = "";
+//     await account.save();
 
-    account.avatar = "";
-    await account.save();
+//     req.session.user.avatar = "";
+//     res.redirect("/profile");
+//   } catch (err) {
+//     console.error(err);
+//     res.sendStatus(500);
+//   }
+// });
 
-    req.session.user.avatar = "";
-    res.redirect("/profile");
-  } catch (err) {
-    console.error(err);
-    res.sendStatus(500);
-  }
-});
+// // POST update bio
+// app.post("/profile/bio", requireLogin, async (req, res) => {
+//   try {
+//     const { bio } = req.body;
+//     const safeBio = (bio || "").toString().slice(0, 500).trim();
+//     const updated = await Account.findByIdAndUpdate(
+//       req.session.user.id,
+//       { bio: safeBio },
+//       { new: true }
+//     ).lean();
 
-// POST update bio
-app.post("/profile/bio", requireLogin, async (req, res) => {
-  try {
-    const { bio } = req.body;
-    const safeBio = (bio || "").toString().slice(0, 500).trim();
-    const updated = await Account.findByIdAndUpdate(req.session.user.id, { bio: safeBio }, { new: true }).lean();
-
-    res.render("profile", { account: updated, user: req.session.user, flash: { type: "success", msg: "Bio saved." } });
-  } catch (err) {
-    console.error(err);
-    res.sendStatus(500);
-  }
-});
+//     res.render("profile", {
+//       account: updated,
+//       user: req.session.user,
+//       flash: { type: "success", msg: "Bio saved." },
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.sendStatus(500);
+//   }
+// });
 
 // Logout
 app.get("/logout", (req, res) => {
