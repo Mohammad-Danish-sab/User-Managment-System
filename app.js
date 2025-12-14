@@ -137,16 +137,16 @@ app.post("/register", async (req, res) => {
 });
 
 // GET profile page
-app.get("/profile", requireLogin, async (req, res) => {
-  try {
-    const account = await Account.findById(req.session.user.id).lean();
-    // pass the account fetched from DB and the session user
-    res.render("profile", { account, user: req.session.user, flash: {} });
-  } catch (err) {
-    console.error(err);
-    res.sendStatus(500);
-  }
-});
+// app.get("/profile", requireLogin, async (req, res) => {
+//   try {
+//     const account = await Account.findById(req.session.user.id).lean();
+//     // pass the account fetched from DB and the session user
+//     res.render("profile", { account, user: req.session.user, flash: {} });
+//   } catch (err) {
+//     console.error(err);
+//     res.sendStatus(500);
+//   }
+// });
 
 // app.post(
 //   "/profile/avatar",
